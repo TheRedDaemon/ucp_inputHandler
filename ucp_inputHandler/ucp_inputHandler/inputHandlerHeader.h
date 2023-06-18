@@ -39,7 +39,7 @@ namespace InputHandlerHeader
   using FuncRegisterRawEvent = bool(__stdcall*)(const char* keyMapName, const char* eventName,
     const char* asciiTitle, RawKeyEventFunc* func);
 
-  inline constexpr char const* NAME_VERSION{ "0.1.0" };
+  inline constexpr char const* NAME_VERSION{ "0.2.0" };
 
   inline constexpr char const* NAME_MODULE{ "inputHandler" };
   inline constexpr char const* NAME_LOCK_KEY_MAP{ "_LockKeyMap@4" };
