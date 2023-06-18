@@ -10,12 +10,7 @@
 // lua module load
 extern "C" __declspec(dllexport) int __cdecl luaopen_inputHandler(lua_State * L)
 {
-  if (!LuaLog::initLog(L))
-  {
-    luaL_error(L, "[InputHandler]: Failed to receive Log functions.");
-  }
-
-  if (!WinProcHeader::initModuleFunctions(L))
+  if (!WinProcHeader::initModuleFunctions())
   {
     luaL_error(L, "[InputHandler]: Failed to receive WinProcHandler functions.");
   }
@@ -23,7 +18,7 @@ extern "C" __declspec(dllexport) int __cdecl luaopen_inputHandler(lua_State * L)
 
   if (!InitStructures())
   {
-    LuaLog::Log(LuaLog::LOG_FATAL, "[InputHandler]: Failed to initialize the handler.");
+    Log(LOG_FATAL, "[InputHandler]: Failed to initialize the handler.");
   }
 
   luaState = L; // keep ref to lua
@@ -41,22 +36,6 @@ extern "C" __declspec(dllexport) int __cdecl luaopen_inputHandler(lua_State * L)
   // address
   lua_pushinteger(L, (DWORD)&crusaderArrowKeyState);
   lua_setfield(L, -2, "address_FillWithArrowKeyStateStructAddr");
-
-  // add functions
-  lua_newtable(L); // push function table
-  lua_pushinteger(L, (DWORD)LockKeyMap);
-  lua_setfield(L, -2, InputHandlerHeader::NAME_LOCK_KEY_MAP);
-  lua_pushinteger(L, (DWORD)ReleaseKeyMap);
-  lua_setfield(L, -2, InputHandlerHeader::NAME_RELEASE_KEY_MAP);
-  lua_pushinteger(L, (DWORD)RegisterKeyComb);
-  lua_setfield(L, -2, InputHandlerHeader::NAME_REGISTER_KEY_COMB);
-  lua_pushinteger(L, (DWORD)RegisterEvent);
-  lua_setfield(L, -2, InputHandlerHeader::NAME_REGISTER_EVENT);
-  lua_pushinteger(L, (DWORD)RegisterRawEvent);
-  lua_setfield(L, -2, InputHandlerHeader::NAME_REGISTER_RAW_EVENT);
-
-  // add table
-  lua_setfield(L, -2, "funcPtr");
 
   // return lua funcs
 
@@ -79,21 +58,4 @@ extern "C" __declspec(dllexport) int __cdecl luaopen_inputHandler(lua_State * L)
   lua_setfield(L, -2, "lua_RegisterKeyAlias");
 
   return 1;
-}
-
-// entry point
-BOOL APIENTRY DllMain(HMODULE,
-  DWORD  ul_reason_for_call,
-  LPVOID
-)
-{
-  switch (ul_reason_for_call)
-  {
-    case DLL_PROCESS_ATTACH:
-    case DLL_THREAD_ATTACH:
-    case DLL_THREAD_DETACH:
-    case DLL_PROCESS_DETACH:
-      break;
-  }
-  return TRUE;
 }

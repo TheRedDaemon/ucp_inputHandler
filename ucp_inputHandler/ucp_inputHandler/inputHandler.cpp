@@ -30,16 +30,16 @@ bool InitStructures()
     switch (ev.status)
     {
       case IHH::KeyStatus::RESET:
-        LuaLog::Log(LuaLog::LOG_INFO, "I am a secret reset.");
+        Log(LOG_INFO, "I am a secret reset.");
         break;
       case IHH::KeyStatus::KEY_DOWN:
-        LuaLog::Log(LuaLog::LOG_INFO, "I am a secret key down.");
+        Log(LOG_INFO, "I am a secret key down.");
         break;
       case IHH::KeyStatus::KEY_HOLD:
-        LuaLog::Log(LuaLog::LOG_INFO, "I am a secret key hold.");
+        Log(LOG_INFO, "I am a secret key hold.");
         break;
       case IHH::KeyStatus::KEY_UP:
-        LuaLog::Log(LuaLog::LOG_INFO, "I am a secret key up.");
+        Log(LOG_INFO, "I am a secret key up.");
         break;
       default:
         break;
@@ -60,7 +60,7 @@ SHORT __stdcall GetAsyncKeyFake(int vKey)
   }
   else
   {
-    LuaLog::Log(LuaLog::LOG_FATAL, "[InputHandler]: 'GetAsyncKeyFake' received key it can not handle.");
+    Log(LOG_FATAL, "[InputHandler]: 'GetAsyncKeyFake' received key it can not handle.");
     return 0;
   }
 }
@@ -281,7 +281,7 @@ const IHH::KeyEventFunc* KeyMap::getHandlerFunc(IHH::KeyEvent ev)
   if (eventIter == eventMap.end())
   {
     // this may or may not be a bad idea
-    LuaLog::Log(LuaLog::LOG_WARNING, "Encountered registered key combination without event.");
+    Log(LOG_WARNING, "Encountered registered key combination without event.");
     return nullptr;
   }
   return &eventIter->second.eventFunc;
@@ -392,7 +392,7 @@ bool handleLuaEvents(const std::string* mapRef, const std::string* eventName, IH
 {
   if (luaState == nullptr || luaControlFuncIndex == 0)
   {
-    LuaLog::Log(LuaLog::LOG_ERROR, "[inputHandler]: Missing lua state or handling func. Can not handle lua key event.");
+    Log(LOG_ERROR, "[inputHandler]: Missing lua state or handling func. Can not handle lua key event.");
     return false;
   }
 
@@ -412,13 +412,13 @@ bool handleLuaEvents(const std::string* mapRef, const std::string* eventName, IH
   {
     std::string err{ "[inputHandler]: Lua key event caused error: " };
     err.append(lua_tostring(luaState, -1));
-    LuaLog::Log(LuaLog::LOG_ERROR, err.c_str());
+    Log(LOG_ERROR, err.c_str());
     return false;
   }
 
   if (!lua_isboolean(luaState, -1))
   {
-    LuaLog::Log(LuaLog::LOG_ERROR, "[inputHandler]: Lua key event did not return a boolean.");
+    Log(LOG_ERROR, "[inputHandler]: Lua key event did not return a boolean.");
   }
   bool res{ static_cast<bool>(lua_toboolean(luaState, -1)) };
   lua_pop(luaState, 1);  // pop returned value

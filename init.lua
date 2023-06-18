@@ -335,30 +335,39 @@ end
 
 --[[ Main Func ]]--
 
+local function getAddress(aob, errorMsg, modifierFunc)
+  local address = core.AOBScan(aob, 0x400000)
+  if address == nil then
+    log(ERROR, errorMsg)
+    error("'inputHandler' can not be initialized.")
+  end
+  if modifierFunc == nil then
+    return address;
+  end
+  return modifierFunc(address)
+end
+
 exports.enable = function(self, moduleConfig, globalConfig)
 
   --[[ get addresses ]]--
 
-  local asyncKeyStateFuncAddr = core.AOBScan("53 56 57 8b 3d ? ? ? 00 8b f1", 0x400000)
-  if asyncKeyStateFuncAddr == nil then
-    log(ERROR, "'inputHandler' was unable to find the address of the key state function and the jump address of 'GetAsyncKeyState'.")
-    error("'inputHandler' can not be initialized.")
-  end
+  local asyncKeyStateFuncAddr = getAddress(
+    "53 56 57 8b 3d ? ? ? 00 8b f1",
+    "'inputHandler' was unable to find the address of the key state function and the jump address of 'GetAsyncKeyState'."
+  )
   local asyncKeyFuncJumpAddr = core.readInteger(asyncKeyStateFuncAddr + 5) -- move to address and then read actual address
   
-  local keyStateStructAddr = core.AOBScan("89 2d ? ? ? 00 0f 87 ? ? ? ff", 0x400000)
-  if keyStateStructAddr == nil then
-    log(ERROR, "'inputHandler' was unable to find the key state struct of Crusader.")
-    error("'inputHandler' can not be initialized.")
-  end
-  keyStateStructAddr = core.readInteger(keyStateStructAddr + 2) -- move pointer to address, then read the value
+  local keyStateStructAddr = getAddress(
+    "89 2d ? ? ? 00 0f 87 ? ? ? ff",
+    "'inputHandler' was unable to find the key state struct of Crusader.",
+    function(foundAddress) return core.readInteger(foundAddress + 2) end -- move pointer to address, then read the value
+  )
   
-  local arrowKeyStructAddr = core.AOBScan("ff 24 85 ? ? ? 00 89 1d ? ? ? 01 e9 ? ? ? ff", 0x400000)
-  if arrowKeyStructAddr == nil then
-    log(ERROR, "'inputHandler' was unable to find the arrow key struct of Crusader.")
-    error("'inputHandler' can not be initialized.")
-  end
-  arrowKeyStructAddr = core.readInteger(arrowKeyStructAddr + 9) -- move pointer to address, then read the value
+  local arrowKeyStructAddr = getAddress(
+    "ff 24 85 ? ? ? 00 89 1d ? ? ? 01 e9 ? ? ? ff",
+    "'inputHandler' was unable to find the arrow key struct of Crusader.",
+    function(foundAddress) return core.readInteger(foundAddress + 9) end -- move pointer to address, then read the value
+  )
   
   --[[
     Note: Crusader has an additional function that sets key states: 00468a10.
@@ -368,10 +377,6 @@ exports.enable = function(self, moduleConfig, globalConfig)
   --[[ load module ]]--
   
   local requireTable = require("inputHandler.dll") -- loads the dll in memory and runs luaopen_winProcHandler
-  
-  for name, addr in pairs(requireTable.funcPtr) do
-    self[name] = addr
-  end
 
   self.DEFAULT_KEY_MAP = ""
   self.status = status -- status enums, basically; should not be changed (but they could)

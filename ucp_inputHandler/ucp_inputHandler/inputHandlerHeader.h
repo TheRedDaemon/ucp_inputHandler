@@ -2,6 +2,8 @@
 #ifndef INPUT_HANDLER_HEADER
 #define INPUT_HANDLER_HEADER
 
+#include <ucp3.h>
+
 #include <functional>
 #include <lua.hpp>
 
@@ -40,8 +42,9 @@ namespace InputHandlerHeader
     const char* asciiTitle, RawKeyEventFunc* func);
 
   inline constexpr char const* NAME_VERSION{ "0.2.0" };
-
   inline constexpr char const* NAME_MODULE{ "inputHandler" };
+  inline constexpr char const* NAME_LIBRARY{ "inputHandler.dll" };
+
   inline constexpr char const* NAME_LOCK_KEY_MAP{ "_LockKeyMap@4" };
   inline constexpr char const* NAME_RELEASE_KEY_MAP{ "_ReleaseKeyMap@4" };
   inline constexpr char const* NAME_REGISTER_KEY_COMB{ "_RegisterKeyComb@24" };
@@ -57,35 +60,13 @@ namespace InputHandlerHeader
   inline constexpr char const* DEFAULT_KEY_MAP{ "" };
 
   // returns true if the function variables of this header were successfully filled
-  inline bool initModuleFunctions(lua_State* L)
+  inline bool initModuleFunctions()
   {
-    if (LockKeyMap && ReleaseKeyMap && RegisterKeyComb && RegisterEvent && RegisterRawEvent) // assumed to not change during runtime
-    {
-      return true;
-    }
-
-    if (lua_getglobal(L, "modules") != LUA_TTABLE)
-    {
-      lua_pop(L, 1);  // remove value
-      return false;
-    }
-
-    if (lua_getfield(L, -1, NAME_MODULE) != LUA_TTABLE)
-    {
-      lua_pop(L, 2);  // remove table and value
-      return false;
-    }
-
-    LockKeyMap = (lua_getfield(L, -1, NAME_LOCK_KEY_MAP) == LUA_TNUMBER) ? (FuncKeyMap)lua_tointeger(L, -1) : nullptr;
-    lua_pop(L, 1);  // remove value
-    ReleaseKeyMap = (lua_getfield(L, -1, NAME_RELEASE_KEY_MAP) == LUA_TNUMBER) ? (FuncKeyMap)lua_tointeger(L, -1) : nullptr;
-    lua_pop(L, 1);  // remove value
-    RegisterKeyComb = (lua_getfield(L, -1, NAME_REGISTER_KEY_COMB) == LUA_TNUMBER) ? (FuncRegisterKeyComb)lua_tointeger(L, -1) : nullptr;
-    lua_pop(L, 1);  // remove value
-    RegisterEvent = (lua_getfield(L, -1, NAME_REGISTER_EVENT) == LUA_TNUMBER) ? (FuncRegisterEvent)lua_tointeger(L, -1) : nullptr;
-    lua_pop(L, 1);  // remove value
-    RegisterRawEvent = (lua_getfield(L, -1, NAME_REGISTER_RAW_EVENT) == LUA_TNUMBER) ? (FuncRegisterRawEvent)lua_tointeger(L, -1) : nullptr;
-    lua_pop(L, 3);  // remove value and all tables
+    LockKeyMap = (FuncKeyMap) ucp_getProcAddressFromLibraryInModule(NAME_MODULE, NAME_LIBRARY, NAME_LOCK_KEY_MAP);
+    ReleaseKeyMap = (FuncKeyMap) ucp_getProcAddressFromLibraryInModule(NAME_MODULE, NAME_LIBRARY, NAME_RELEASE_KEY_MAP);
+    RegisterKeyComb = (FuncRegisterKeyComb) ucp_getProcAddressFromLibraryInModule(NAME_MODULE, NAME_LIBRARY, NAME_REGISTER_KEY_COMB);
+    RegisterEvent = (FuncRegisterEvent) ucp_getProcAddressFromLibraryInModule(NAME_MODULE, NAME_LIBRARY, NAME_REGISTER_EVENT);
+    RegisterRawEvent = (FuncRegisterRawEvent) ucp_getProcAddressFromLibraryInModule(NAME_MODULE, NAME_LIBRARY, NAME_REGISTER_RAW_EVENT);
 
     return LockKeyMap && ReleaseKeyMap && RegisterKeyComb && RegisterEvent && RegisterRawEvent;
   }
