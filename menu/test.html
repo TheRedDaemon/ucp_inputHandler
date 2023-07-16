@@ -16,20 +16,38 @@
     <h1>{{menu.alias.headline}}</h1>
     <p>{{menu.alias.description}}</p>
   </div>
-  <div class="table-main">
-    <div class="table-content-item table-header">
-      <div class="table-cell">{{menu.alias.keys.combination}}</div>
-      <div class="table-cell">{{menu.alias.keys.to.alias}}</div>
-      <div class="table-button trash-img"></div>
-    </div>
-    <div class="table-content">
-      <div class="table-content-item">
-        <input class="table-cell" />
-        <input class="table-cell" />
-        <button class="table-button"></button>
-      </div>
-    </div>
-  </div>
+  <table class="table-main">
+    <thead class="table-header">
+      <tr class="table-content-item">
+        <th class="table-cell">{{menu.alias.keys.combination}}</th>
+        <th class="table-cell">{{menu.alias.keys.to.alias}}</th>
+        <th class="table-button"></th>
+      </tr>
+    </thead>
+    <tbody class="table-content">
+      <tr class="table-content-item">
+        <td class="table-cell"></td>
+        <td tabindex="0" class="table-cell"></td>
+        <td class="table-button">
+          <div class="trash-img"></div>
+        </td>
+      </tr>
+      <tr class="table-content-item">
+        <td class="table-cell"></td>
+        <td tabindex="0" class="table-cell"></td>
+        <td class="table-button">
+          <div class="trash-img"></div>
+        </td>
+      </tr>
+    </tbody>
+    <tbody class="table-footer">
+      <tr class="table-content-item">
+        <td tabindex="0" id="key-alias-edit" class="table-cell"></td>
+        <td tabindex="0" id="key-combination-edit" class="table-cell"></td>
+        <td class="table-button"></td>
+      </tr>
+    </tfoot>
+  </table>
   <p class="license">Icons taken from icons8, License: https://icons8.com/license</p>
 </body>
 
