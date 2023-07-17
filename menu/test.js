@@ -150,10 +150,16 @@ const KEY_MAP = new Map([
     [0xFE, "OEM_CLEAR"],
 ]);
 
+const VALID_MODIFIER_SET = new Set([MODIFIER_CONTROL, MODIFIER_SHIFT, MODIFIER_ALT]);
+
+const VALID_KEY_SET = new Set(KEY_MAP.values());
+
+const NEW_ALIAS_ELEMENTS = {
+    alias: undefined,
+    combination: undefined,
+}
 
 const CURRENT_KEY_COMBINATIONS = {};
-
-let currentTargetElement = null;
 
 function handleInputKeydown(event) {
     if (event.defaultPrevented) {
@@ -188,6 +194,7 @@ function handleInputKeydown(event) {
         } else {
             resultCombination = null;
         }
+        removeEdit(event.currentTarget);
     }
 
     event.currentTarget.textContent = resultCombination;
@@ -196,12 +203,6 @@ function handleInputKeydown(event) {
     event.preventDefault();
 }
 
-function simpleValidateKeyCombination(event) {
-    const currentValue = event.currentTarget.textContent;
-    if (!currentValue.slice(currentValue.lastIndexOf("+") + 1)) {
-        event.currentTarget.textContent = null;
-    }
-}
 
 function activateEditUsingKeyboard(event) {
     if (event.defaultPrevented) {
@@ -209,47 +210,101 @@ function activateEditUsingKeyboard(event) {
     }
 
     if (event.key === "Enter") {
-        activateEdit(event);
+        activateEdit(event.currentTarget);
     }
 }
-
 
 function activateEditUsingMouse(event) {
     if (event.defaultPrevented) {
         return; // Do nothing if the event was already processed
     }
-    activateEdit(event);
+    activateEdit(event.currentTarget);
 }
 
-function activateEdit(event) {
-    const element = event.currentTarget;
+function activateEdit(element) {
     if (element === document.activeElement) {
         element.classList.add("table-cell-edit");
         element.textContent = null;
         element.onkeydown = handleInputKeydown;
-        element.addEventListener("focusout", removeEdit);
+        element.addEventListener("focusout", removeEditEvent);
     }
 }
 
-function removeEdit(event) {
-    if (event.defaultPrevented) {
-        return; // Do nothing if the event was already processed
-    }
-
-    const element = event.currentTarget;
+function removeEdit(element) {
     element.classList.remove("table-cell-edit");
     element.onkeydown = activateEditUsingKeyboard;
-    element.removeEventListener("focusout", removeEdit);
+    element.removeEventListener("focusout", removeEditEvent);
 }
-// TODO: delete on not valid if keyup
+
+function removeEditEvent(event) {
+    if (event.defaultPrevented) {
+        return;
+    }
+    removeEdit(event.currentTarget);
+}
+
+function validateKeyCombination(combinationString) {
+    const splitArray = combinationString.split("+")
+    const arrayLength = splitArray.length;
+    if (arrayLength < 1 || arrayLength > 4) {
+        return false;
+    }
+    const validKey = VALID_KEY_SET.has(splitArray.pop());
+    let validModifiers = splitArray.reduce(
+        (currentState, modifier) => currentState && VALID_MODIFIER_SET.has(modifier),
+        true
+    );
+    return validModifiers && validKey;
+}
+
+function getKeyCombinationDataFromSubElement(element) {
+    const tableContentItem = element.closest(".table-content-item");
+    return {
+        contentItem: tableContentItem,
+        alias: tableContentItem.children[0].textContent,
+        combination: tableContentItem.children[1].textContent,
+    }
+}
+
+async function extractOldConfig() {
+    const oldConfig = await HOST_FUNCTIONS.getCurrentConfig();
+    if (!oldConfig || typeof oldConfig !== 'object') {
+        return;
+    }
+
+    for (const key in oldConfig) {
+        if (!Object.hasOwn(oldConfig, key)) {
+            continue;
+        }
+        const configCombination = oldConfig[key];
+
+        if (validateKeyCombination(key) && validateKeyCombination(configCombination)) {
+            CURRENT_KEY_COMBINATIONS[key] = configCombination;
+        }
+    }
+}
 
 addEventListener(
     DONE_EVENT_NAME,
-    () => {
+    async () => {
+        // dummy:
+        HOST_FUNCTIONS.getCurrentConfig = async () => ({
+            "CONTROL+B": "ALT+H",
+            "K": "Hi",
+        });
+
+        await extractOldConfig();
+
         const aliasInput = document.querySelector("#key-alias-edit");
+
+        // dummy
+        aliasInput.onmouseover = (event) => console.log(getKeyCombinationDataFromSubElement(event.currentTarget));
+
         aliasInput.ondblclick = activateEditUsingMouse;
         aliasInput.onkeydown = activateEditUsingKeyboard;
     },
     { once: true }
 );
 
+// allows to find file for debugging
+//# sourceURL=input-handler-alias.js
