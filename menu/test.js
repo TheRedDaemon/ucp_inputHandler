@@ -154,12 +154,15 @@ const VALID_MODIFIER_SET = new Set([MODIFIER_CONTROL, MODIFIER_SHIFT, MODIFIER_A
 
 const VALID_KEY_SET = new Set(KEY_MAP.values());
 
-const NEW_ALIAS_ELEMENTS = {
+const MAIN_ELEMENTS = {
+    content: undefined,
     alias: undefined,
+    adder: undefined,
     combination: undefined,
+    warning: undefined,
 }
 
-const CURRENT_KEY_COMBINATIONS = {};
+const CURRENT_KEY_COMBINATIONS = new Map();
 
 function handleInputKeydown(event) {
     if (event.defaultPrevented) {
@@ -171,29 +174,9 @@ function handleInputKeydown(event) {
         return;
     }
 
-    let resultCombination = "";
+    const resultCombination = receiveKeyCombinationFromKeyEvent(event);
 
-    if (event.ctrlKey) {
-        resultCombination += MODIFIER_CONTROL + "+"
-    }
-
-    if (event.shiftKey) {
-        resultCombination += MODIFIER_SHIFT + "+"
-    }
-
-    if (event.altKey) {
-        resultCombination += MODIFIER_ALT + "+"
-    }
-
-    // TODO: add check if already applied and prevent remove
-    if (!(event.key === "Control" || event.key === "Shift" || event.key === "Alt")) {
-        const keyString = KEY_MAP.get(event.keyCode);
-
-        if (keyString) {
-            resultCombination += keyString;
-        } else {
-            resultCombination = null;
-        }
+    if (!resultCombination || validateKeyCombination(resultCombination)) {
         removeEdit(event.currentTarget);
     }
 
@@ -203,15 +186,18 @@ function handleInputKeydown(event) {
     event.preventDefault();
 }
 
-
-function activateEditUsingKeyboard(event) {
+function performOnEnterKeyDown(event, action) {
     if (event.defaultPrevented) {
         return; // Do nothing if the event was already processed
     }
 
     if (event.key === "Enter") {
-        activateEdit(event.currentTarget);
+        action(event);
     }
+}
+
+function activateEditUsingKeyboard(event) {
+    performOnEnterKeyDown(event, (event) => activateEdit(event.currentTarget));
 }
 
 function activateEditUsingMouse(event) {
@@ -234,6 +220,24 @@ function removeEdit(element) {
     element.classList.remove("table-cell-edit");
     element.onkeydown = activateEditUsingKeyboard;
     element.removeEventListener("focusout", removeEditEvent);
+
+    // validate contained data
+
+    if (isNewAliasFooterElement(element)) {
+        if (!validateKeyCombination(element.textContent)) {
+            element.textContent = null;
+        }
+        return;
+    }
+
+    // handle edits of combination for alias
+    const combinationData = getKeyCombinationDataFromSubElement(element);
+    if (validateKeyCombination(element.textContent)) {
+        CURRENT_KEY_COMBINATIONS.set(combinationData.alias, element.textContent);
+    } else {
+        // reset
+        element.textContent = CURRENT_KEY_COMBINATIONS.get(combinationData.alias);
+    }
 }
 
 function removeEditEvent(event) {
@@ -266,6 +270,84 @@ function getKeyCombinationDataFromSubElement(element) {
     }
 }
 
+function receiveKeyCombinationFromKeyEvent(keyEvent) {
+    let resultCombination = "";
+
+    if (keyEvent.ctrlKey) {
+        resultCombination += MODIFIER_CONTROL + "+"
+    }
+
+    if (keyEvent.shiftKey) {
+        resultCombination += MODIFIER_SHIFT + "+"
+    }
+
+    if (keyEvent.altKey) {
+        resultCombination += MODIFIER_ALT + "+"
+    }
+
+    if (!(keyEvent.key === "Control" || keyEvent.key === "Shift" || keyEvent.key === "Alt")) {
+        const keyString = KEY_MAP.get(keyEvent.keyCode);
+
+        if (keyString) {
+            resultCombination += keyString;
+        } else {
+            resultCombination = null;
+        }
+    }
+
+    return resultCombination;
+}
+
+function addEditToTableCell(element) {
+    element.ondblclick = activateEditUsingMouse;
+    element.onkeydown = activateEditUsingKeyboard;
+}
+
+function isNewAliasFooterElement(element) {
+    return element === MAIN_ELEMENTS.alias || element === MAIN_ELEMENTS.combination;
+}
+
+function removeGivenContentItemAndKey(element) {
+    const data = getKeyCombinationDataFromSubElement(element);
+    CURRENT_KEY_COMBINATIONS.delete(data.alias);
+    data.contentItem.remove();
+}
+
+function onClickRemoveGivenContentItemAndKey(event) {
+    removeGivenContentItemAndKey(event.currentTarget);
+}
+
+function onEnterKeyDownRemoveGivenContentItemAndKey(event) {
+    performOnEnterKeyDown(event, (event) => removeGivenContentItemAndKey(event.currentTarget))
+}
+
+// does not care about alias uniqueness
+function addNewContentItem(alias, combination) {
+    const row = document.createElement("tr");
+    row.classList.add("table-content-item");
+
+    const aliasCell = document.createElement("td");
+    aliasCell.classList.add("table-cell");
+    aliasCell.textContent = alias;
+    row.appendChild(aliasCell);
+
+    const combinationCell = document.createElement("td");
+    combinationCell.classList.add("table-cell");
+    combinationCell.textContent = combination;
+    combinationCell.tabIndex = 0;
+    addEditToTableCell(combinationCell);
+    row.appendChild(combinationCell);
+
+    const buttonCell = document.createElement("td");
+    buttonCell.classList.add("table-button", "table-button-remove");
+    buttonCell.tabIndex = 0;
+    buttonCell.onclick = onClickRemoveGivenContentItemAndKey;
+    buttonCell.onkeydown = onEnterKeyDownRemoveGivenContentItemAndKey;
+    row.appendChild(buttonCell);
+
+    MAIN_ELEMENTS.content.appendChild(row);
+}
+
 async function extractOldConfig() {
     const oldConfig = await HOST_FUNCTIONS.getCurrentConfig();
     if (!oldConfig || typeof oldConfig !== 'object') {
@@ -279,9 +361,24 @@ async function extractOldConfig() {
         const configCombination = oldConfig[key];
 
         if (validateKeyCombination(key) && validateKeyCombination(configCombination)) {
-            CURRENT_KEY_COMBINATIONS[key] = configCombination;
+            CURRENT_KEY_COMBINATIONS.set(key, configCombination);
         }
     }
+
+    CURRENT_KEY_COMBINATIONS.forEach((combination, key) => addNewContentItem(key, combination));
+}
+
+function initMainElements() {
+    const footer = document.querySelector(".table-footer");
+    MAIN_ELEMENTS.alias = footer.querySelector("#key-alias-edit");
+    MAIN_ELEMENTS.combination = footer.querySelector("#key-combination-edit");
+    MAIN_ELEMENTS.adder = footer.querySelector(".table-button-accept");
+
+    MAIN_ELEMENTS.content = document.querySelector(".table-content");
+    MAIN_ELEMENTS.warning = document.querySelector(".warning-message");
+
+    addEditToTableCell(MAIN_ELEMENTS.alias);
+    addEditToTableCell(MAIN_ELEMENTS.combination);
 }
 
 addEventListener(
@@ -293,15 +390,9 @@ addEventListener(
             "K": "Hi",
         });
 
+
+        initMainElements();
         await extractOldConfig();
-
-        const aliasInput = document.querySelector("#key-alias-edit");
-
-        // dummy
-        aliasInput.onmouseover = (event) => console.log(getKeyCombinationDataFromSubElement(event.currentTarget));
-
-        aliasInput.ondblclick = activateEditUsingMouse;
-        aliasInput.onkeydown = activateEditUsingKeyboard;
     },
     { once: true }
 );
