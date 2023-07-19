@@ -1,4 +1,6 @@
 
+/** KEYS **/
+
 const MODIFIER_CONTROL = "CONTROL";
 const MODIFIER_SHIFT = "SHIFT";
 const MODIFIER_ALT = "ALT";
@@ -150,13 +152,16 @@ const KEY_MAP = new Map([
     [0xFE, "OEM_CLEAR"],
 ]);
 
+
+/** VARIABLES **/
+
 const VALID_MODIFIER_SET = new Set([MODIFIER_CONTROL, MODIFIER_SHIFT, MODIFIER_ALT]);
 
 const VALID_KEY_SET = new Set(KEY_MAP.values());
 
 const MAIN_ELEMENTS = {
     content: undefined,
-    alias: undefined,
+    key: undefined,
     adder: undefined,
     combination: undefined,
     warning: undefined,
@@ -164,26 +169,21 @@ const MAIN_ELEMENTS = {
 
 const CURRENT_KEY_COMBINATIONS = new Map();
 
-function handleInputKeydown(event) {
-    if (event.defaultPrevented) {
-        return; // Do nothing if the event was already processed
-    }
 
-    if (event.repeat) {
-        event.preventDefault();
-        return;
-    }
+/** BASE FUNCTIONS **/
 
-    const resultCombination = receiveKeyCombinationFromKeyEvent(event);
+function isContentItemFooterElement(element) {
+    return element === MAIN_ELEMENTS.key || element === MAIN_ELEMENTS.combination;
+}
 
-    if (!resultCombination || validateKeyCombination(resultCombination)) {
-        removeEdit(event.currentTarget);
-    }
+function displayWarning(messageId) {
+    const warningElement = MAIN_ELEMENTS.warning;
+    warningElement.textContent = `{{${messageId}}}`;
+    replaceAllLocalizeTextMarkers(MAIN_ELEMENTS.warning);
+}
 
-    event.currentTarget.textContent = resultCombination;
-
-    // Cancel the default action to avoid it being handled twice
-    event.preventDefault();
+function resetWarning() {
+    MAIN_ELEMENTS.warning.textContent = "\u00a0";
 }
 
 function performOnEnterKeyDown(event, action) {
@@ -194,57 +194,6 @@ function performOnEnterKeyDown(event, action) {
     if (event.key === "Enter") {
         action(event);
     }
-}
-
-function activateEditUsingKeyboard(event) {
-    performOnEnterKeyDown(event, (event) => activateEdit(event.currentTarget));
-}
-
-function activateEditUsingMouse(event) {
-    if (event.defaultPrevented) {
-        return; // Do nothing if the event was already processed
-    }
-    activateEdit(event.currentTarget);
-}
-
-function activateEdit(element) {
-    if (element === document.activeElement) {
-        element.classList.add("table-cell-edit");
-        element.textContent = null;
-        element.onkeydown = handleInputKeydown;
-        element.addEventListener("focusout", removeEditEvent);
-    }
-}
-
-function removeEdit(element) {
-    element.classList.remove("table-cell-edit");
-    element.onkeydown = activateEditUsingKeyboard;
-    element.removeEventListener("focusout", removeEditEvent);
-
-    // validate contained data
-
-    if (isNewAliasFooterElement(element)) {
-        if (!validateKeyCombination(element.textContent)) {
-            element.textContent = null;
-        }
-        return;
-    }
-
-    // handle edits of combination for alias
-    const combinationData = getKeyCombinationDataFromSubElement(element);
-    if (validateKeyCombination(element.textContent)) {
-        CURRENT_KEY_COMBINATIONS.set(combinationData.alias, element.textContent);
-    } else {
-        // reset
-        element.textContent = CURRENT_KEY_COMBINATIONS.get(combinationData.alias);
-    }
-}
-
-function removeEditEvent(event) {
-    if (event.defaultPrevented) {
-        return;
-    }
-    removeEdit(event.currentTarget);
 }
 
 function validateKeyCombination(combinationString) {
@@ -265,7 +214,7 @@ function getKeyCombinationDataFromSubElement(element) {
     const tableContentItem = element.closest(".table-content-item");
     return {
         contentItem: tableContentItem,
-        alias: tableContentItem.children[0].textContent,
+        key: tableContentItem.children[0].textContent,
         combination: tableContentItem.children[1].textContent,
     }
 }
@@ -298,18 +247,86 @@ function receiveKeyCombinationFromKeyEvent(keyEvent) {
     return resultCombination;
 }
 
-function addEditToTableCell(element) {
-    element.ondblclick = activateEditUsingMouse;
-    element.onkeydown = activateEditUsingKeyboard;
+function handleInputKeydownForKeyCombination(event) {
+    if (event.defaultPrevented) {
+        return; // Do nothing if the event was already processed
+    }
+
+    if (event.repeat) {
+        event.preventDefault();
+        return;
+    }
+
+    const resultCombination = receiveKeyCombinationFromKeyEvent(event);
+
+    event.currentTarget.textContent = resultCombination;
+    if (!resultCombination || validateKeyCombination(resultCombination)) {
+        removeCombinationEdit(event.currentTarget);
+    }
+
+    // Cancel the default action to avoid it being handled twice
+    event.preventDefault();
 }
 
-function isNewAliasFooterElement(element) {
-    return element === MAIN_ELEMENTS.alias || element === MAIN_ELEMENTS.combination;
+function activateCombinationEdit(element) {
+    if (element === document.activeElement) {
+        element.classList.add("table-cell-edit");
+        element.textContent = null;
+        element.onkeydown = handleInputKeydownForKeyCombination;
+        element.addEventListener("focusout", removeCombinationEditEvent);
+    }
+}
+
+function activateCombinationEditUsingKeyboard(event) {
+    performOnEnterKeyDown(event, (event) => activateCombinationEdit(event.currentTarget));
+}
+
+function activateCombinationEditUsingMouse(event) {
+    if (event.defaultPrevented) {
+        return; // Do nothing if the event was already processed
+    }
+    activateCombinationEdit(event.currentTarget);
+}
+
+function addCombinationEditToTableCell(element) {
+    element.ondblclick = activateCombinationEditUsingMouse;
+    element.onkeydown = activateCombinationEditUsingKeyboard;
+}
+
+function removeCombinationEdit(element) {
+    element.classList.remove("table-cell-edit");
+    element.onkeydown = activateCombinationEditUsingKeyboard;
+    element.removeEventListener("focusout", removeCombinationEditEvent);
+
+    // validate contained data
+
+    if (isContentItemFooterElement(element)) {
+        if (!validateKeyCombination(element.textContent)) {
+            element.textContent = null;
+        }
+        return;
+    }
+
+    // handle edits of combination
+    const combinationData = getKeyCombinationDataFromSubElement(element);
+    if (validateKeyCombination(element.textContent)) {
+        CURRENT_KEY_COMBINATIONS.set(combinationData.key, element.textContent);
+    } else {
+        // reset
+        element.textContent = CURRENT_KEY_COMBINATIONS.get(combinationData.key);
+    }
+}
+
+function removeCombinationEditEvent(event) {
+    if (event.defaultPrevented) {
+        return;
+    }
+    removeCombinationEdit(event.currentTarget);
 }
 
 function removeGivenContentItemAndKey(element) {
     const data = getKeyCombinationDataFromSubElement(element);
-    CURRENT_KEY_COMBINATIONS.delete(data.alias);
+    CURRENT_KEY_COMBINATIONS.delete(data.key);
     data.contentItem.remove();
 }
 
@@ -321,21 +338,21 @@ function onEnterKeyDownRemoveGivenContentItemAndKey(event) {
     performOnEnterKeyDown(event, (event) => removeGivenContentItemAndKey(event.currentTarget))
 }
 
-// does not care about alias uniqueness
-function addNewContentItem(alias, combination) {
+// does not care about key uniqueness
+function addNewContentItem(key, combination) {
     const row = document.createElement("tr");
     row.classList.add("table-content-item");
 
-    const aliasCell = document.createElement("td");
-    aliasCell.classList.add("table-cell");
-    aliasCell.textContent = alias;
-    row.appendChild(aliasCell);
+    const keyCell = document.createElement("td");
+    keyCell.classList.add("table-cell");
+    keyCell.textContent = key;
+    row.appendChild(keyCell);
 
     const combinationCell = document.createElement("td");
     combinationCell.classList.add("table-cell");
     combinationCell.textContent = combination;
     combinationCell.tabIndex = 0;
-    addEditToTableCell(combinationCell);
+    addCombinationEditToTableCell(combinationCell);
     row.appendChild(combinationCell);
 
     const buttonCell = document.createElement("td");
@@ -348,7 +365,60 @@ function addNewContentItem(alias, combination) {
     MAIN_ELEMENTS.content.appendChild(row);
 }
 
-async function extractOldConfig() {
+function validateAndAddNewActionPair(key, combination, validateKey = () => true, validateCombination = () => true, disableWarnings) {
+    const warn = disableWarnings ? () => { } : displayWarning;
+
+    if (!key) {
+        warn("menu.warning.key.empty");
+        return false;
+    }
+
+    if (!combination) {
+        warn("menu.warning.combination.empty");
+        return false;
+    }
+
+    if (CURRENT_KEY_COMBINATIONS.has(key)) {
+        warn("menu.warning.key.used");
+        return false;
+    }
+
+    if (!validateKey(key)) {
+        warn("menu.warning.key.invalid");
+        return false;
+    }
+
+    if (!validateCombination(combination)) {
+        warn("menu.warning.combination.invalid");
+        return false;
+    }
+
+    CURRENT_KEY_COMBINATIONS.set(key, combination);
+    addNewContentItem(key, combination);
+    return true;
+}
+
+function addNewContentItemAndKey(validateKey, validateCombination) {
+    const keyElement = MAIN_ELEMENTS.key;
+    const combinationElement = MAIN_ELEMENTS.combination;
+
+    const res = validateAndAddNewActionPair(keyElement.textContent, combinationElement.textContent, validateKey, validateCombination);
+    if (res) {
+        keyElement.textContent = null;
+        combinationElement.textContent = null;
+        resetWarning();
+    }
+}
+
+function addFunctionsForNewContentItemAndKeyCalls(validateKey, validateCombination) {
+    const createFunc = () => addNewContentItemAndKey(validateKey, validateCombination);
+
+    const adderButton = MAIN_ELEMENTS.adder;
+    adderButton.onclick = createFunc;
+    adderButton.onkeydown = (event) => performOnEnterKeyDown(event, createFunc);
+}
+
+async function extractOldConfig(validateKey, validateCombination) {
     const oldConfig = await HOST_FUNCTIONS.getCurrentConfig();
     if (!oldConfig || typeof oldConfig !== 'object') {
         return;
@@ -359,27 +429,33 @@ async function extractOldConfig() {
             continue;
         }
         const configCombination = oldConfig[key];
-
-        if (validateKeyCombination(key) && validateKeyCombination(configCombination)) {
-            CURRENT_KEY_COMBINATIONS.set(key, configCombination);
-        }
+        validateAndAddNewActionPair(key, configCombination, validateKey, validateCombination, true);
     }
-
-    CURRENT_KEY_COMBINATIONS.forEach((combination, key) => addNewContentItem(key, combination));
 }
 
 function initMainElements() {
     const footer = document.querySelector(".table-footer");
-    MAIN_ELEMENTS.alias = footer.querySelector("#key-alias-edit");
+    MAIN_ELEMENTS.key = footer.querySelector("#key-key-edit");
     MAIN_ELEMENTS.combination = footer.querySelector("#key-combination-edit");
     MAIN_ELEMENTS.adder = footer.querySelector(".table-button-accept");
 
     MAIN_ELEMENTS.content = document.querySelector(".table-content");
     MAIN_ELEMENTS.warning = document.querySelector(".warning-message");
 
-    addEditToTableCell(MAIN_ELEMENTS.alias);
-    addEditToTableCell(MAIN_ELEMENTS.combination);
+    addCombinationEditToTableCell(MAIN_ELEMENTS.combination);
 }
+
+
+/** ALIAS **/
+
+async function initAliasEditor() {
+    addCombinationEditToTableCell(MAIN_ELEMENTS.key);
+    addFunctionsForNewContentItemAndKeyCalls(validateKeyCombination, validateKeyCombination);
+    await extractOldConfig(validateKeyCombination, validateKeyCombination);
+}
+
+
+/** INIT **/
 
 addEventListener(
     DONE_EVENT_NAME,
@@ -392,10 +468,11 @@ addEventListener(
 
 
         initMainElements();
-        await extractOldConfig();
+        await initAliasEditor(); // currently only support for alias editor
+        SANDBOX_FUNCTIONS.getConfig = () => Object.fromEntries(CURRENT_KEY_COMBINATIONS.entries());
     },
     { once: true }
 );
 
 // allows to find file for debugging
-//# sourceURL=input-handler-alias.js
+//# sourceURL=input-handler.js
